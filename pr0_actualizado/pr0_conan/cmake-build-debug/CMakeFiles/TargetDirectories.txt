@@ -1,0 +1,3 @@
+C:/Szkola/Graphics/pr0_actualizado/pr0_conan/cmake-build-debug/CMakeFiles/pr1.dir
+C:/Szkola/Graphics/pr0_actualizado/pr0_conan/cmake-build-debug/CMakeFiles/edit_cache.dir
+C:/Szkola/Graphics/pr0_actualizado/pr0_conan/cmake-build-debug/CMakeFiles/rebuild_cache.dir

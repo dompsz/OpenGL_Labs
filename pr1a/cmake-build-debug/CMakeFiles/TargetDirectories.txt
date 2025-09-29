@@ -1,0 +1,3 @@
+C:/Szkola/Graphics/pr1a/cmake-build-debug/CMakeFiles/pr1a.dir
+C:/Szkola/Graphics/pr1a/cmake-build-debug/CMakeFiles/edit_cache.dir
+C:/Szkola/Graphics/pr1a/cmake-build-debug/CMakeFiles/rebuild_cache.dir

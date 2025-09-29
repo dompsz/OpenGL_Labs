@@ -1,0 +1,110 @@
+"C:\Program Files\JetBrains\CLion 2023.2.2\bin\cmake\win\x64\bin\cmake.exe" -DCMAKE_BUILD_TYPE=Debug "-DCMAKE_MAKE_PROGRAM=C:/Program Files/JetBrains/CLion 2023.2.2/bin/ninja/win/x64/ninja.exe" -DCMAKE_PROJECT_TOP_LEVEL_INCLUDES=conan_provider.cmake -G Ninja -S C:\Szkola\Graphics\pr0_actualizado\pr0_conan -B C:\Szkola\Graphics\pr0_actualizado\pr0_conan\cmake-build-debug
+-- CMake-Conan: first find_package() found. Installing dependencies with Conan
+-- CMake-Conan: Checking if a default profile exists
+C:\Users\HP\.conan2\profiles\default
+-- CMake-Conan: cmake_system_name=Windows
+-- CMake-Conan: cmake_system_processor=x86_64
+-- CMake-Conan: CMake compiler=GNU
+-- CMake-Conan: CMake compiler version=13.1.0
+-- CMake-Conan: [settings] compiler=gcc
+-- CMake-Conan: [settings] compiler.version=13
+-- CMake-Conan: Creating profile C:/Szkola/Graphics/pr0_actualizado/pr0_conan/cmake-build-debug/conan_host_profile
+-- CMake-Conan: Profile: 
+include(default)
+[settings]
+arch=x86_64
+os=Windows
+compiler=gcc
+compiler.version=13
+compiler.cppstd=14
+build_type=Debug
+[conf]
+tools.cmake.cmaketoolchain:generator=Ninja
+
+-- CMake-Conan: Installing single configuration Debug
+-- CMake-Conan: conan install C:/Szkola/Graphics/pr0_actualizado/pr0_conan -of=C:/Szkola/Graphics/pr0_actualizado/pr0_conan/cmake-build-debug/conan -pr;C:/Szkola/Graphics/pr0_actualizado/pr0_conan/cmake-build-debug/conan_host_profile;--build=missing;-g;CMakeDeps
+
+======== Input profiles ========
+Profile host:
+[settings]
+arch=x86_64
+build_type=Debug
+compiler=gcc
+compiler.cppstd=14
+compiler.libcxx=libstdc++11
+compiler.version=13
+os=Windows
+[conf]
+tools.cmake.cmaketoolchain:generator=Ninja
+
+Profile build:
+[settings]
+arch=x86_64
+build_type=Release
+compiler=gcc
+compiler.cppstd=14
+compiler.libcxx=libstdc++11
+compiler.version=13
+os=Windows
+
+
+======== Computing dependency graph ========
+Graph root
+    conanfile.py: C:/Szkola/Graphics/pr0_actualizado/pr0_conan\conanfile.py
+Requirements
+    freeglut/3.4.0#5674e666d6bb21d45e778c6b710a213d - Cache
+    glu/system#a5189f60c8270ac97ed29d7f36fffe39 - Cache
+    khrplatform/cci.20200529#b1ab63bdc5fcef59f4cb2b96749a61cc - Cache
+    opengl/system#7c02ea6ef926fd04844af53622a30541 - Cache
+    opengl-registry/cci.20220929#fda1f167ad89f7bc2c21e99998c351dc - Cache
+
+======== Computing necessary packages ========
+Requirements
+    freeglut/3.4.0#5674e666d6bb21d45e778c6b710a213d:1369079bc143c17932bb06e372788a53c929c21e#936a41cb297c573ad1e24aeaea4e9d30 - Cache
+    glu/system#a5189f60c8270ac97ed29d7f36fffe39:da39a3ee5e6b4b0d3255bfef95601890afd80709#0ba8627bd47edc3a501e8f0eb9a79e5e - Cache
+    khrplatform/cci.20200529#b1ab63bdc5fcef59f4cb2b96749a61cc:da39a3ee5e6b4b0d3255bfef95601890afd80709#f6ca34b0055eeb66de8e0cb09c284e44 - Cache
+    opengl-registry/cci.20220929#fda1f167ad89f7bc2c21e99998c351dc:da39a3ee5e6b4b0d3255bfef95601890afd80709#26f580fe059036ad87647726361c788f - Cache
+    opengl/system#7c02ea6ef926fd04844af53622a30541:da39a3ee5e6b4b0d3255bfef95601890afd80709#0ba8627bd47edc3a501e8f0eb9a79e5e - Cache
+
+======== Installing packages ========
+khrplatform/cci.20200529: Already installed! (1 of 5)
+opengl/system: Already installed! (2 of 5)
+glu/system: Already installed! (3 of 5)
+opengl-registry/cci.20220929: Already installed! (4 of 5)
+freeglut/3.4.0: Already installed! (5 of 5)
+WARN: deprecated: Usage of deprecated Conan 1.X features that will be removed in Conan 2.X:
+WARN: deprecated:     'cpp_info.filenames' used in: opengl/system
+WARN: deprecated:     'cpp_info.names' used in: freeglut/3.4.0
+
+======== Finalizing install (deploy, generators) ========
+conanfile.py: Writing generators to C:\Szkola\Graphics\pr0_actualizado\pr0_conan\cmake-build-debug\conan\build\Debug\generators
+conanfile.py: Generator 'CMakeDeps' calling 'generate()'
+conanfile.py: CMakeDeps necessary find_package() and targets for your CMakeLists.txt
+    find_package(opengl-registry)
+    find_package(FreeGLUT)
+    find_package(opengl_system)
+    target_link_libraries(... opengl-registry::opengl-registry FreeGLUT::freeglut_static opengl::opengl)
+conanfile.py: Calling generate()
+conanfile.py: Generators folder: C:\Szkola\Graphics\pr0_actualizado\pr0_conan\cmake-build-debug\conan\build\Debug\generators
+conanfile.py: CMakeToolchain generated: conan_toolchain.cmake
+conanfile.py: CMakeToolchain: Preset 'conan-debug' added to CMakePresets.json.
+    (cmake>=3.23) cmake --preset conan-debug
+    (cmake<3.23) cmake <path> -G Ninja -DCMAKE_TOOLCHAIN_FILE=generators\conan_toolchain.cmake  -DCMAKE_POLICY_DEFAULT_CMP0091=NEW -DCMAKE_BUILD_TYPE=Debug
+conanfile.py: CMakeToolchain generated: C:\Szkola\Graphics\pr0_actualizado\pr0_conan\cmake-build-debug\conan\build\Debug\generators\CMakePresets.json
+conanfile.py: Generating aggregated env files
+conanfile.py: Generated aggregated env files: ['conanbuild.bat', 'conanrun.bat']
+Install finished successfully
+-- CMake-Conan: CONAN_GENERATORS_FOLDER=C:\Szkola\Graphics\pr0_actualizado\pr0_conan\cmake-build-debug\conan\build\Debug\generators
+-- CMake-Conan: CONANFILE=C:/Szkola/Graphics/pr0_actualizado/pr0_conan/conanfile.py
+-- Conan: Target declared 'opengl::opengl'
+-- CMake-Conan: find_package(opengl-registry) found, 'conan install' already ran
+-- Conan: Target declared 'opengl-registry::opengl-registry'
+-- CMake-Conan: find_package(khrplatform) found, 'conan install' already ran
+-- Conan: Target declared 'khrplatform::khrplatform'
+-- CMake-Conan: find_package(FreeGLUT) found, 'conan install' already ran
+-- Conan: Component target declared 'FreeGLUT::freeglut_static'
+-- CMake-Conan: find_package(glu) found, 'conan install' already ran
+-- Conan: Target declared 'glu::glu'
+-- Configuring done (3.6s)
+-- Generating done (0.1s)
+-- Build files have been written to: C:/Szkola/Graphics/pr0_actualizado/pr0_conan/cmake-build-debug
