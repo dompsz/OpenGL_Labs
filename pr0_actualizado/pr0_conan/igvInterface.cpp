@@ -2,6 +2,8 @@
 
 #include "igvInterface.h"
 
+#include <math.h>
+
 
 // Application of the Singleton pattern
 igvInterface* igvInterface::_instance = nullptr;
@@ -17,9 +19,9 @@ static int selected = 0;   // current object
 
 
 struct Camera {
-    float eyeX = 1.5f, eyeY = 1.0f, eyeZ = 2.0f; // camera position
-    float centerX = 0.0f, centerY = 0.0f, centerZ = 0.0f; // look-at target
-    float upX = 0.0f, upY = 1.0f, upZ = 0.0f; // up vector
+    float radius = 3.0f;    // distance from origin
+    float azimuth = 45.0f;  // left-right angle in degrees
+    float elevation = 20.0f; // up-down angle in degrees
 };
 
 static Camera cam;
@@ -109,19 +111,26 @@ void igvInterface::keyboardFunc(unsigned char key, int x, int y)
     case 'S': obj[selected].scale *= 1.1f; break;
     case 's': obj[selected].scale /= 1.1f; break;
         // Camera
-    case '=': cam.eyeZ -= 0.1f; break; // zoom in, '=' instead of '+' for convience of not using shift
-    case '-': cam.eyeZ += 0.1f; break; // zoom out
+    case '=': // zoom in
+        cam.radius -= 0.2f;
+        if (cam.radius < 0.5f) cam.radius = 0.5f; // prevent flipping through origin
+        break;
+    case '-': // zoom out
+        cam.radius += 0.2f;
+        break;
+
    }
    glutPostRedisplay(); // refreshes the contents of the view window
 }
 
 void igvInterface::specialFunc(int key, int x, int y) {
     switch (key) {
-        case GLUT_KEY_UP:    cam.eyeY += 0.2f; break;
-        case GLUT_KEY_DOWN:  cam.eyeY -= 0.2f; break;
-        case GLUT_KEY_LEFT:  cam.eyeX -= 0.2f; break;
-        case GLUT_KEY_RIGHT: cam.eyeX += 0.2f; break;
+        case GLUT_KEY_UP:    cam.elevation += 2.0f; break;
+        case GLUT_KEY_DOWN:  cam.elevation -= 2.0f; break;
+        case GLUT_KEY_LEFT:  cam.azimuth -= 2.0f; break;
+        case GLUT_KEY_RIGHT: cam.azimuth += 2.0f; break;
     }
+
     glutPostRedisplay();
 }
 
@@ -146,14 +155,11 @@ void igvInterface::reshapeFunc(int w, int h)
    glMatrixMode(GL_PROJECTION);
    glLoadIdentity();
 
-   glOrtho(-1,1,-1,1,-1,200);
+    float aspect = (float)w / (float)h;
+    gluPerspective(60.0, aspect, 0.1, 200.0); // perspective projection
 
-   // the vision camera is defined
-   glMatrixMode(GL_MODELVIEW);
-   glLoadIdentity();
-   gluLookAt(cam.eyeX, cam.eyeY, cam.eyeZ,
-          cam.centerX, cam.centerY, cam.centerZ,
-          cam.upX, cam.upY, cam.upZ);
+    // back to modelview, ale BEZ gluLookAt
+    glMatrixMode(GL_MODELVIEW);
 }
 
 /**
@@ -171,9 +177,16 @@ void igvInterface::displayFunc()
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // clears the window and the Z-buffer
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity(); // reset modelview
-    gluLookAt(cam.eyeX, cam.eyeY, cam.eyeZ,
-              cam.centerX, cam.centerY, cam.centerZ,
-              cam.upX, cam.upY, cam.upZ);
+    float radA = cam.azimuth * M_PI / 180.0f;
+    float radE = cam.elevation * M_PI / 180.0f;
+
+    float eyeX = cam.radius * cos(radE) * cos(radA);
+    float eyeY = cam.radius * sin(radE);
+    float eyeZ = cam.radius * cos(radE) * sin(radA);
+
+    gluLookAt(eyeX, eyeY, eyeZ,
+              0.0, 0.0, 0.0,  // always look at origin
+              0.0, 1.0, 0.0);
 
     glPushMatrix(); // saves the modeling matrix
 
@@ -200,7 +213,6 @@ void igvInterface::displayFunc()
     // // Section B: primitive cube in wireframe mode
     // glColor3f(0.0, 0.0, 0.0); // black cube
     // glutWireCube(1.0);        // cube centered at origin with size 1
-
 
     // Section C
     glPushMatrix();
