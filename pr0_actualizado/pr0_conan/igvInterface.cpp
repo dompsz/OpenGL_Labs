@@ -26,6 +26,10 @@ struct Camera {
 
 static Camera cam;
 
+static bool bufferMode = false;
+static ObjectState buffer; // R-S-T
+
+
 // Public methods ----------------------------------------
 
 /**
@@ -93,35 +97,111 @@ void igvInterface::start_display_loop()
  *       change
  */
 void igvInterface::keyboardFunc(unsigned char key, int x, int y)
-{  switch (key)
-   {
-    case 27: exit(1); break; //Escape
-    case '1': selected = 0; break;
-    case '2': selected = 1; break;
-    case '3': selected = 2; break;
-        // Translations
-    case 'U': obj[selected].ty += 0.1f; break;
-    case 'u': obj[selected].ty -= 0.1f; break;
-    case 'X': obj[selected].rx += 2.0f; break;
-    case 'x': obj[selected].rx -= 2.0f; break;
-    case 'Y': obj[selected].ry += 2.0f; break;
-    case 'y': obj[selected].ry -= 2.0f; break;
-    case 'Z': obj[selected].rz += 2.0f; break;
-    case 'z': obj[selected].rz -= 2.0f; break;
-    case 'S': obj[selected].scale *= 1.1f; break;
-    case 's': obj[selected].scale /= 1.1f; break;
-        // Camera
-    case '=': // zoom in
-        cam.radius -= 0.2f;
-        if (cam.radius < 0.5f) cam.radius = 0.5f; // prevent flipping through origin
-        break;
-    case '-': // zoom out
-        cam.radius += 0.2f;
-        break;
+{
+    static bool bufferMode = false; // toggle with 'm'
+    static ObjectState buffer = {0,0,0,0,0,0,1}; // temp transform buffer
 
-   }
-   glutPostRedisplay(); // refreshes the contents of the view window
+    switch (key)
+    {
+        case 27: exit(1); break; // Escape key exits
+        case '1': selected = 0; break;
+        case '2': selected = 1; break;
+        case '3': selected = 2; break;
+
+        // Toggle buffering mode
+        case 'm':
+            if (!bufferMode) {
+                // start recording new transform set
+                buffer = {0,0,0,0,0,0,1};
+                printf("Buffer mode ON (recording new transform)\n");
+                bufferMode = true;
+            } else {
+                // finish recording but keep stored values
+                bufferMode = false;
+                printf("Buffer mode OFF (ready to apply stored transform)\n");
+            }
+            break;
+
+            // Apply stored buffer
+        case 'M':
+        {
+            obj[selected].rx += buffer.rx;
+            obj[selected].ry += buffer.ry;
+            obj[selected].rz += buffer.rz;
+
+            obj[selected].scale *= buffer.scale;
+
+            obj[selected].tx += buffer.tx;
+            obj[selected].ty += buffer.ty;
+            obj[selected].tz += buffer.tz;
+
+            printf("Applied stored transform (R-S-T)\n");
+        }
+            break;
+
+        // Translation Y
+        case 'U':
+            if (bufferMode) buffer.ty += 0.1f;
+            else obj[selected].ty += 0.1f;
+            break;
+        case 'u':
+            if (bufferMode) buffer.ty -= 0.1f;
+            else obj[selected].ty -= 0.1f;
+            break;
+
+        // Rotation X
+        case 'X':
+            if (bufferMode) buffer.rx += 2.0f;
+            else obj[selected].rx += 2.0f;
+            break;
+        case 'x':
+            if (bufferMode) buffer.rx -= 2.0f;
+            else obj[selected].rx -= 2.0f;
+            break;
+
+        // Rotation Y
+        case 'Y':
+            if (bufferMode) buffer.ry += 2.0f;
+            else obj[selected].ry += 2.0f;
+            break;
+        case 'y':
+            if (bufferMode) buffer.ry -= 2.0f;
+            else obj[selected].ry -= 2.0f;
+            break;
+
+        // Rotation Z
+        case 'Z':
+            if (bufferMode) buffer.rz += 2.0f;
+            else obj[selected].rz += 2.0f;
+            break;
+        case 'z':
+            if (bufferMode) buffer.rz -= 2.0f;
+            else obj[selected].rz -= 2.0f;
+            break;
+
+        // Scaling
+        case 'S':
+            if (bufferMode) buffer.scale *= 1.1f;
+            else obj[selected].scale *= 1.1f;
+            break;
+        case 's':
+            if (bufferMode) buffer.scale /= 1.1f;
+            else obj[selected].scale /= 1.1f;
+            break;
+
+        // Camera zoom
+        case '=': // zoom in
+            cam.radius -= 0.2f;
+            if (cam.radius < 0.5f) cam.radius = 0.5f;
+            break;
+        case '-': // zoom out
+            cam.radius += 0.2f;
+            break;
+    }
+
+    glutPostRedisplay(); // refresh display
 }
+
 
 void igvInterface::specialFunc(int key, int x, int y) {
     switch (key) {
@@ -195,18 +275,18 @@ void igvInterface::displayFunc()
 
     // X axis - red
     glColor3f(1.0, 0.0, 0.0);
-    glVertex3f(-2.0, 0.0, 0.0);
-    glVertex3f( 2.0, 0.0, 0.0);
+    glVertex3f(-20.0, 0.0, 0.0);
+    glVertex3f( 20.0, 0.0, 0.0);
 
     // Y axis - green
     glColor3f(0.0, 1.0, 0.0);
-    glVertex3f(0.0, -2.0, 0.0);
-    glVertex3f(0.0,  2.0, 0.0);
+    glVertex3f(0.0, -20.0, 0.0);
+    glVertex3f(0.0,  20.0, 0.0);
 
     // Z axis - blue
     glColor3f(0.0, 0.0, 1.0);
-    glVertex3f(0.0, 0.0, -2.0);
-    glVertex3f(0.0, 0.0,  2.0);
+    glVertex3f(0.0, 0.0, -20.0);
+    glVertex3f(0.0, 0.0,  20.0);
 
     glEnd();
 
@@ -226,7 +306,7 @@ void igvInterface::displayFunc()
     // object selection execution
     if (selected == 0) {
         // cube
-        glColor3f(1.0, 0.0, 1.0);
+        glColor3f(1.0, 0.0, 0.0);
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
         glutSolidCube(1.0);
         // outlines
@@ -235,7 +315,7 @@ void igvInterface::displayFunc()
     }
     else if (selected == 1) {
         // cone
-        glColor3f(1.0, 0.0, 1.0);
+        glColor3f(0.0, 1.0, 0.0);
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
         glutSolidCone(0.5, 1.0, 32, 32);
         // outlines
@@ -244,7 +324,7 @@ void igvInterface::displayFunc()
     }
     else if (selected == 2) {
         // sphere
-        glColor3f(1.0, 0.0, 1.0);
+        glColor3f(0.0, 0.0, 1.0);
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
         glutSolidSphere(0.5, 32, 32);
         // outlines
