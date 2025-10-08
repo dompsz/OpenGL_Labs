@@ -24,10 +24,11 @@ struct Camera {
     float elevation = 20.0f; // up-down angle in degrees
 };
 
+static bool cameraMode = false; // true = move camera, false = move object
 static Camera cam;
 
 static bool bufferMode = false;
-static ObjectState buffer; // R-S-T
+static ObjectState buffer = {0,0,0,0,0,0,1}; // R-S-T
 
 
 // Public methods ----------------------------------------
@@ -96,11 +97,30 @@ void igvInterface::start_display_loop()
  * @post The attribute that indicates whether the axes should be drawn or not can
  *       change
  */
+
+// Apply object's local rotation to a translation vector (convert local -> world)
+void applyLocalTranslation(const ObjectState& o, float tx, float ty, float tz, float& outX, float& outY, float& outZ) {
+    float rx = o.rx * M_PI / 180.0f;
+    float ry = o.ry * M_PI / 180.0f;
+    float rz = o.rz * M_PI / 180.0f;
+
+    float cx = cos(rx), sx = sin(rx);
+    float cy = cos(ry), sy = sin(ry);
+    float cz = cos(rz), sz = sin(rz);
+
+    // Z * Y * X rotation order (same as OpenGL)
+    outX = cy * cz * tx + (-cy * sz) * ty + sy * tz;
+    outY = (sx * sy * cz + cx * sz) * tx +
+           (-sx * sy * sz + cx * cz) * ty +
+           (-sx * cy) * tz;
+    outZ = (-cx * sy * cz + sx * sz) * tx +
+           (cx * sy * sz + sx * cz) * ty +
+           (cx * cy) * tz;
+}
+
+
 void igvInterface::keyboardFunc(unsigned char key, int x, int y)
 {
-    static bool bufferMode = false; // toggle with 'm'
-    static ObjectState buffer = {0,0,0,0,0,0,1}; // temp transform buffer
-
     switch (key)
     {
         case 27: exit(1); break; // Escape key exits
@@ -122,32 +142,59 @@ void igvInterface::keyboardFunc(unsigned char key, int x, int y)
             }
             break;
 
-            // Apply stored buffer
-        case 'M':
-        {
+            // Apply stored RST buffer
+        case 'M': {
+            float rx = obj[selected].rx * M_PI / 180.0f;
+            float ry = obj[selected].ry * M_PI / 180.0f;
+            float rz = obj[selected].rz * M_PI / 180.0f;
+
+            float cx = cos(rx), sx = sin(rx);
+            float cy = cos(ry), sy = sin(ry);
+            float cz = cos(rz), sz = sin(rz);
+
+            float tx = buffer.tx;
+            float ty = buffer.ty;
+            float tz = buffer.tz;
+
+            float tx_world =
+                cy * cz * tx + (-cy * sz) * ty + sy * tz;
+            float ty_world =
+                (sx * sy * cz + cx * sz) * tx +
+                (-sx * sy * sz + cx * cz) * ty +
+                (-sx * cy) * tz;
+            float tz_world =
+                (-cx * sy * cz + sx * sz) * tx +
+                (cx * sy * sz + sx * cz) * ty +
+                (cx * cy) * tz;
+
             obj[selected].rx += buffer.rx;
             obj[selected].ry += buffer.ry;
             obj[selected].rz += buffer.rz;
 
             obj[selected].scale *= buffer.scale;
 
-            obj[selected].tx += buffer.tx;
-            obj[selected].ty += buffer.ty;
-            obj[selected].tz += buffer.tz;
+            obj[selected].tx += tx_world;
+            obj[selected].ty += ty_world;
+            obj[selected].tz += tz_world;
 
-            printf("Applied stored transform (R-S-T)\n");
-        }
+            printf("Applied buffered transform\n");
             break;
+        }
+
 
         // Translation Y
-        case 'U':
-            if (bufferMode) buffer.ty += 0.1f;
-            else obj[selected].ty += 0.1f;
+        case 'U': {
+            float dx, dy, dz;
+            applyLocalTranslation(obj[selected], 0.0f, 0.1f, 0.0f, dx, dy, dz);
+            obj[selected].tx += dx; obj[selected].ty += dy; obj[selected].tz += dz;
             break;
-        case 'u':
-            if (bufferMode) buffer.ty -= 0.1f;
-            else obj[selected].ty -= 0.1f;
+        }
+        case 'u': {
+            float dx, dy, dz;
+            applyLocalTranslation(obj[selected], 0.0f, -0.1f, 0.0f, dx, dy, dz);
+            obj[selected].tx += dx; obj[selected].ty += dy; obj[selected].tz += dz;
             break;
+        }
 
         // Rotation X
         case 'X':
@@ -197,6 +244,14 @@ void igvInterface::keyboardFunc(unsigned char key, int x, int y)
         case '-': // zoom out
             cam.radius += 0.2f;
             break;
+        case 'c':
+            cameraMode = !cameraMode;
+            if (cameraMode)
+                printf("Camera mode ON (arrow keys move camera)\n");
+            else
+                printf("Object mode ON (arrow keys move object)\n");
+            break;
+
     }
 
     glutPostRedisplay(); // refresh display
@@ -204,15 +259,51 @@ void igvInterface::keyboardFunc(unsigned char key, int x, int y)
 
 
 void igvInterface::specialFunc(int key, int x, int y) {
-    switch (key) {
-        case GLUT_KEY_UP:    cam.elevation += 2.0f; break;
-        case GLUT_KEY_DOWN:  cam.elevation -= 2.0f; break;
-        case GLUT_KEY_LEFT:  cam.azimuth -= 2.0f; break;
-        case GLUT_KEY_RIGHT: cam.azimuth += 2.0f; break;
+    if (cameraMode) {
+        // Camera orbit movement
+        switch (key) {
+            case GLUT_KEY_UP:    cam.elevation += 2.0f; break;
+            case GLUT_KEY_DOWN:  cam.elevation -= 2.0f; break;
+            case GLUT_KEY_LEFT:  cam.azimuth -= 2.0f; break;
+            case GLUT_KEY_RIGHT: cam.azimuth += 2.0f; break;
+        }
+    } else {
+        // Object movement
+        float dx, dy, dz;
+
+        switch (key) {
+            case GLUT_KEY_UP:
+                applyLocalTranslation(obj[selected], 0.0f, 0.0f, -0.1f, dx, dy, dz);
+                break;
+            case GLUT_KEY_DOWN:
+                applyLocalTranslation(obj[selected], 0.0f, 0.0f,  0.1f, dx, dy, dz);
+                break;
+            case GLUT_KEY_LEFT:
+                applyLocalTranslation(obj[selected], -0.1f, 0.0f, 0.0f, dx, dy, dz);
+                break;
+            case GLUT_KEY_RIGHT:
+                applyLocalTranslation(obj[selected],  0.1f, 0.0f, 0.0f, dx, dy, dz);
+                break;
+            default:
+                dx = dy = dz = 0.0f;
+        }
+
+        if (bufferMode) {
+            // Record translation into buffer (in local space)
+            buffer.tx += dx;
+            buffer.ty += dy;
+            buffer.tz += dz;
+        } else {
+            // Apply translation immediately
+            obj[selected].tx += dx;
+            obj[selected].ty += dy;
+            obj[selected].tz += dz;
+        }
     }
 
     glutPostRedisplay();
 }
+
 
 
 /**
