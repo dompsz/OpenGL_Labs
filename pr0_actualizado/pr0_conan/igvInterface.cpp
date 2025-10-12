@@ -1,9 +1,7 @@
 #include <cstdlib>
-
 #include "igvInterface.h"
-
 #include <math.h>
-
+#include <vector>
 
 // Application of the Singleton pattern
 igvInterface* igvInterface::_instance = nullptr;
@@ -19,17 +17,36 @@ static int selected = 0;   // current object
 
 
 struct Camera {
-    float radius = 3.0f;    // distance from origin
-    float azimuth = 45.0f;  // left-right angle in degrees
-    float elevation = 20.0f; // up-down angle in degrees
+    float radius = 3.0f;      // distance from origin
+    float azimuth = 45.0f;    // horizontal angle (degrees)
+    float elevation = 20.0f;  // vertical angle (degrees)
+
+    float nearPlane = 0.1f;   // front clipping plane
+    float farPlane  = 200.0f; // rear clipping plane
+
+    bool perspective = true;  // toggle projection type
 };
+
 
 static bool cameraMode = false; // true = move camera, false = move object
 static Camera cam;
 
-static bool bufferMode = false;
-static ObjectState buffer = {0,0,0,0,0,0,1}; // R-S-T
+enum class TransformType {
+    TRANSLATE,
+    ROTATE,
+    SCALE
+};
 
+// Stores a single transformation operation
+struct Transformation {
+    TransformType type;
+    float x, y, z; // Vector for translation or axis for rotation
+    float value;   // Angle for rotation or factor for scaling
+};
+
+// buffer using a vector to store the sequence of transformations
+static std::vector<Transformation> transformBuffer;
+static bool bufferMode = false;
 
 // Public methods ----------------------------------------
 
@@ -123,121 +140,124 @@ void igvInterface::keyboardFunc(unsigned char key, int x, int y)
 {
     switch (key)
     {
-        case 27: exit(1); break; // Escape key exits
+        case 27: exit(1); break; // Escape
         case '1': selected = 0; break;
         case '2': selected = 1; break;
         case '3': selected = 2; break;
 
         // Toggle buffering mode
         case 'm':
-            if (!bufferMode) {
-                // start recording new transform set
-                buffer = {0,0,0,0,0,0,1};
-                printf("Buffer mode ON (recording new transform)\n");
-                bufferMode = true;
+            bufferMode = !bufferMode;
+            if (bufferMode) {
+                transformBuffer.clear();
+                printf("Buffer ON\n");
             } else {
-                // finish recording but keep stored values
-                bufferMode = false;
-                printf("Buffer mode OFF (ready to apply stored transform)\n");
+                printf("Buffer OFF\n");
             }
             break;
 
-            // Apply stored RST buffer
+        // Apply stored RST buffer
         case 'M': {
-            float rx = obj[selected].rx * M_PI / 180.0f;
-            float ry = obj[selected].ry * M_PI / 180.0f;
-            float rz = obj[selected].rz * M_PI / 180.0f;
+            if (bufferMode || transformBuffer.empty()) break; // Only apply if not recording and buffer is not empty
 
-            float cx = cos(rx), sx = sin(rx);
-            float cy = cos(ry), sy = sin(ry);
-            float cz = cos(rz), sz = sin(rz);
+            // Create a temporary matrix to apply the buffered transformations
+            glMatrixMode(GL_MODELVIEW);
+            glPushMatrix();
+            glLoadIdentity();
 
-            float tx = buffer.tx;
-            float ty = buffer.ty;
-            float tz = buffer.tz;
+            // Apply each transformation from the buffer in order
+            for (const auto& op : transformBuffer) {
+                if (op.type == TransformType::TRANSLATE) {
+                    glTranslatef(op.x, op.y, op.z);
+                } else if (op.type == TransformType::ROTATE) {
+                    glRotatef(op.value, op.x, op.y, op.z);
+                } else if (op.type == TransformType::SCALE) {
+                    glScalef(op.value, op.value, op.value);
+                }
+            }
 
-            float tx_world =
-                cy * cz * tx + (-cy * sz) * ty + sy * tz;
-            float ty_world =
-                (sx * sy * cz + cx * sz) * tx +
-                (-sx * sy * sz + cx * cz) * ty +
-                (-sx * cy) * tz;
-            float tz_world =
-                (-cx * sy * cz + sx * sz) * tx +
-                (cx * sy * sz + sx * cz) * ty +
-                (cx * cy) * tz;
+            glTranslatef(obj[selected].tx, obj[selected].ty, obj[selected].tz);
+            glRotatef(obj[selected].rx, 1, 0, 0);
+            glRotatef(obj[selected].ry, 0, 1, 0);
+            glRotatef(obj[selected].rz, 0, 0, 1);
+            glScalef(obj[selected].scale, obj[selected].scale, obj[selected].scale);
 
-            obj[selected].rx += buffer.rx;
-            obj[selected].ry += buffer.ry;
-            obj[selected].rz += buffer.rz;
+            // Get the resulting matrix
+            float mat[16];
+            glGetFloatv(GL_MODELVIEW_MATRIX, mat);
+            glPopMatrix();
 
-            obj[selected].scale *= buffer.scale;
+            obj[selected].tx = mat[12];
+            obj[selected].ty = mat[13];
+            obj[selected].tz = mat[14];
 
-            obj[selected].tx += tx_world;
-            obj[selected].ty += ty_world;
-            obj[selected].tz += tz_world;
+            // Extract scale
+            float scaleX = sqrt(mat[0]*mat[0] + mat[1]*mat[1] + mat[2]*mat[2]);
+            obj[selected].scale = scaleX;
 
-            printf("Applied buffered transform\n");
+            // Extract rotation
+            obj[selected].ry = asin(-mat[2]) * 180.0 / M_PI;
+            float cosY = cos(obj[selected].ry * M_PI / 180.0);
+            obj[selected].rx = atan2(mat[6] / cosY, mat[10] / cosY) * 180.0 / M_PI;
+            obj[selected].rz = atan2(mat[1] / cosY, mat[0] / cosY) * 180.0 / M_PI;
+
+            printf("Applied buffered transform sequence\n");
             break;
         }
-
 
         // Translation Y
-        case 'U': {
-            float dx, dy, dz;
-            applyLocalTranslation(obj[selected], 0.0f, 0.1f, 0.0f, dx, dy, dz);
-            obj[selected].tx += dx; obj[selected].ty += dy; obj[selected].tz += dz;
+        case 'U':
+            if (bufferMode) transformBuffer.push_back({TransformType::TRANSLATE, 0.0f, 0.1f, 0.0f});
+            else { float dx, dy, dz; applyLocalTranslation(obj[selected], 0.0f, 0.1f, 0.0f, dx, dy, dz); obj[selected].tx += dx; obj[selected].ty += dy; obj[selected].tz += dz; }
             break;
-        }
-        case 'u': {
-            float dx, dy, dz;
-            applyLocalTranslation(obj[selected], 0.0f, -0.1f, 0.0f, dx, dy, dz);
-            obj[selected].tx += dx; obj[selected].ty += dy; obj[selected].tz += dz;
+        case 'u':
+            if (bufferMode) transformBuffer.push_back({TransformType::TRANSLATE, 0.0f, -0.1f, 0.0f});
+            else { float dx, dy, dz; applyLocalTranslation(obj[selected], 0.0f, -0.1f, 0.0f, dx, dy, dz); obj[selected].tx += dx; obj[selected].ty += dy; obj[selected].tz += dz; }
             break;
-        }
 
         // Rotation X
         case 'X':
-            if (bufferMode) buffer.rx += 2.0f;
+            if (bufferMode) transformBuffer.push_back({TransformType::ROTATE, 1, 0, 0, 2.0f});
             else obj[selected].rx += 2.0f;
             break;
         case 'x':
-            if (bufferMode) buffer.rx -= 2.0f;
+            if (bufferMode) transformBuffer.push_back({TransformType::ROTATE, 1, 0, 0, -2.0f});
             else obj[selected].rx -= 2.0f;
             break;
 
         // Rotation Y
         case 'Y':
-            if (bufferMode) buffer.ry += 2.0f;
+            if (bufferMode) transformBuffer.push_back({TransformType::ROTATE, 0, 1, 0, 2.0f});
             else obj[selected].ry += 2.0f;
             break;
         case 'y':
-            if (bufferMode) buffer.ry -= 2.0f;
+            if (bufferMode) transformBuffer.push_back({TransformType::ROTATE, 0, 1, 0, -2.0f});
             else obj[selected].ry -= 2.0f;
             break;
 
         // Rotation Z
         case 'Z':
-            if (bufferMode) buffer.rz += 2.0f;
+            if (bufferMode) transformBuffer.push_back({TransformType::ROTATE, 0, 0, 1, 2.0f});
             else obj[selected].rz += 2.0f;
             break;
         case 'z':
-            if (bufferMode) buffer.rz -= 2.0f;
+            if (bufferMode) transformBuffer.push_back({TransformType::ROTATE, 0, 0, 1, -2.0f});
             else obj[selected].rz -= 2.0f;
             break;
 
         // Scaling
         case 'S':
-            if (bufferMode) buffer.scale *= 1.1f;
+            if (bufferMode) transformBuffer.push_back({TransformType::SCALE, 0,0,0, 1.1f});
             else obj[selected].scale *= 1.1f;
             break;
         case 's':
-            if (bufferMode) buffer.scale /= 1.1f;
+            if (bufferMode) transformBuffer.push_back({TransformType::SCALE, 0,0,0, 1.0f / 1.1f});
             else obj[selected].scale /= 1.1f;
             break;
 
         // Camera zoom
         case '=': // zoom in
+        case '+': // zoom in
             cam.radius -= 0.2f;
             if (cam.radius < 0.5f) cam.radius = 0.5f;
             break;
@@ -252,11 +272,42 @@ void igvInterface::keyboardFunc(unsigned char key, int x, int y)
                 printf("Object mode ON (arrow keys move object)\n");
             break;
 
+        // Clipping planes control
+        case 'f': // move near plane farther from viewer
+            cam.nearPlane += 0.1f;
+            if (cam.nearPlane >= cam.farPlane - 0.5f)
+                cam.nearPlane = cam.farPlane - 0.5f;
+            printf("Near plane: %.2f\n", cam.nearPlane);
+            break;
+
+        case 'F': // move near plane closer to viewer
+            cam.nearPlane -= 0.1f;
+            if (cam.nearPlane < 0.01f) cam.nearPlane = 0.01f;
+            printf("Near plane: %.2f\n", cam.nearPlane);
+            break;
+
+        case 'b': // move far plane farther from viewer
+            cam.farPlane += 0.5f;
+            printf("Far plane: %.2f\n", cam.farPlane);
+            break;
+
+        case 'B': // move far plane closer to viewer
+            cam.farPlane -= 0.5f;
+            if (cam.farPlane <= cam.nearPlane + 0.5f)
+                cam.farPlane = cam.nearPlane + 0.5f;
+            printf("Far plane: %.2f\n", cam.farPlane);
+            break;
+
+        // Projection type toggle
+        case 'p':
+        case 'P':
+            cam.perspective = !cam.perspective;
+            printf("Projection: %s\n", cam.perspective ? "Perspective" : "Orthographic");
+            break;
     }
 
     glutPostRedisplay(); // refresh display
 }
-
 
 void igvInterface::specialFunc(int key, int x, int y) {
     if (cameraMode) {
@@ -269,32 +320,24 @@ void igvInterface::specialFunc(int key, int x, int y) {
         }
     } else {
         // Object movement
-        float dx, dy, dz;
+        float local_dx = 0.0f, local_dz = 0.0f;
 
         switch (key) {
-            case GLUT_KEY_UP:
-                applyLocalTranslation(obj[selected], 0.0f, 0.0f, -0.1f, dx, dy, dz);
-                break;
-            case GLUT_KEY_DOWN:
-                applyLocalTranslation(obj[selected], 0.0f, 0.0f,  0.1f, dx, dy, dz);
-                break;
-            case GLUT_KEY_LEFT:
-                applyLocalTranslation(obj[selected], -0.1f, 0.0f, 0.0f, dx, dy, dz);
-                break;
-            case GLUT_KEY_RIGHT:
-                applyLocalTranslation(obj[selected],  0.1f, 0.0f, 0.0f, dx, dy, dz);
-                break;
-            default:
-                dx = dy = dz = 0.0f;
+            case GLUT_KEY_UP:    local_dz = -0.1f; break;
+            case GLUT_KEY_DOWN:  local_dz =  0.1f; break;
+            case GLUT_KEY_LEFT:  local_dx = -0.1f; break;
+            case GLUT_KEY_RIGHT: local_dx =  0.1f; break;
         }
 
         if (bufferMode) {
-            // Record translation into buffer (in local space)
-            buffer.tx += dx;
-            buffer.ty += dy;
-            buffer.tz += dz;
+            // Record translation into buffer
+            if (local_dx != 0.0f || local_dz != 0.0f) {
+                transformBuffer.push_back({TransformType::TRANSLATE, local_dx, 0.0f, local_dz});
+            }
         } else {
-            // Apply translation immediately
+            // Apply translation
+            float dx, dy, dz;
+            applyLocalTranslation(obj[selected], local_dx, 0.0f, local_dz, dx, dy, dz);
             obj[selected].tx += dx;
             obj[selected].ty += dy;
             obj[selected].tz += dz;
@@ -303,8 +346,6 @@ void igvInterface::specialFunc(int key, int x, int y) {
 
     glutPostRedisplay();
 }
-
-
 
 /**
  * Method that defines the camera and viewport. It is called automatically
@@ -322,14 +363,22 @@ void igvInterface::reshapeFunc(int w, int h)
    _instance->set_window_width( w );
    _instance->set_window_height( h );
 
-   // sets the type of projection to use
-   glMatrixMode(GL_PROJECTION);
-   glLoadIdentity();
+    // Projection setup
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
 
     float aspect = (float)w / (float)h;
-    gluPerspective(60.0, aspect, 0.1, 200.0); // perspective projection
 
-    // back to modelview, ale BEZ gluLookAt
+    if (cam.perspective) {
+        gluPerspective(60.0, aspect, cam.nearPlane, cam.farPlane);
+    } else {
+        float orthoSize = cam.radius; // roughly match zoom level
+        glOrtho(-orthoSize * aspect, orthoSize * aspect,
+                -orthoSize, orthoSize,
+                cam.nearPlane, cam.farPlane);
+    }
+
+
     glMatrixMode(GL_MODELVIEW);
 }
 
@@ -359,8 +408,6 @@ void igvInterface::displayFunc()
               0.0, 0.0, 0.0,  // always look at origin
               0.0, 1.0, 0.0);
 
-    glPushMatrix(); // saves the modeling matrix
-
     // Section A: paint the axes
     glBegin(GL_LINES);
 
@@ -381,11 +428,7 @@ void igvInterface::displayFunc()
 
     glEnd();
 
-    // // Section B: primitive cube in wireframe mode
-    // glColor3f(0.0, 0.0, 0.0); // black cube
-    // glutWireCube(1.0);        // cube centered at origin with size 1
-
-    // Section C
+    // Section C: object drawing
     glPushMatrix();
     glColor3f(1.0, 1.0, 1.0);
     glTranslatef(obj[selected].tx, obj[selected].ty, obj[selected].tz);
@@ -426,9 +469,6 @@ void igvInterface::displayFunc()
     // reset
     glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
     glLineWidth(1.0f);
-
-    // TODO: Section D: upper face with triangles
-
 
     glPopMatrix(); // restores the modeling matrix
     glutSwapBuffers(); // used instead of glFlush() to prevent flickering
