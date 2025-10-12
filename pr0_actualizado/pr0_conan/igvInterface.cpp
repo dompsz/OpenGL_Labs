@@ -22,7 +22,7 @@ struct Camera {
     float elevation = 20.0f;  // vertical angle (degrees)
 
     float nearPlane = 0.1f;   // front clipping plane
-    float farPlane  = 200.0f; // rear clipping plane
+    float farPlane  = 50.0f; // rear clipping plane
 
     bool perspective = true;  // toggle projection type
 };
@@ -272,22 +272,28 @@ void igvInterface::keyboardFunc(unsigned char key, int x, int y)
                 printf("Object mode ON (arrow keys move object)\n");
             break;
 
-        // Clipping planes control
+            // Clipping planes control
         case 'f': // move near plane farther from viewer
             cam.nearPlane += 0.1f;
             if (cam.nearPlane >= cam.farPlane - 0.5f)
                 cam.nearPlane = cam.farPlane - 0.5f;
+            // Update projection matrix using the singleton instance
+            _instance->reshapeFunc(_instance->get_window_width(), _instance->get_window_height());
             printf("Near plane: %.2f\n", cam.nearPlane);
             break;
 
         case 'F': // move near plane closer to viewer
             cam.nearPlane -= 0.1f;
             if (cam.nearPlane < 0.01f) cam.nearPlane = 0.01f;
+            // Update projection matrix using the singleton instance
+            _instance->reshapeFunc(_instance->get_window_width(), _instance->get_window_height());
             printf("Near plane: %.2f\n", cam.nearPlane);
             break;
 
         case 'b': // move far plane farther from viewer
             cam.farPlane += 0.5f;
+            // Update projection matrix using the singleton instance
+            _instance->reshapeFunc(_instance->get_window_width(), _instance->get_window_height());
             printf("Far plane: %.2f\n", cam.farPlane);
             break;
 
@@ -295,14 +301,18 @@ void igvInterface::keyboardFunc(unsigned char key, int x, int y)
             cam.farPlane -= 0.5f;
             if (cam.farPlane <= cam.nearPlane + 0.5f)
                 cam.farPlane = cam.nearPlane + 0.5f;
+            // Update projection matrix using the singleton instance
+            _instance->reshapeFunc(_instance->get_window_width(), _instance->get_window_height());
             printf("Far plane: %.2f\n", cam.farPlane);
             break;
 
-        // Projection type toggle
+            /// Projection type toggle
         case 'p':
         case 'P':
             cam.perspective = !cam.perspective;
-            printf("Projection: %s\n", cam.perspective ? "Perspective" : "Orthographic");
+            // Update projection matrix using the singleton instance
+            _instance->reshapeFunc(_instance->get_window_width(), _instance->get_window_height());
+            printf("Projection: %s\n", cam.perspective ? "Perspective" : "Orthogonal");
             break;
     }
 
